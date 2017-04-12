@@ -9,9 +9,23 @@ var blocks = [];
 var enemies = [];
 
 var the_one_and_only_audio = new Audio("DONT FUCKING STOP ME.mp3");
+
 the_one_and_only_audio.loop = true;
+the_one_and_only_audio.volume = 0.1;
 
 var score = 0;
+
+var game_state = "MENU";
+
+var Mouse = {
+	mousex: 0,
+    mousey: 0,
+    move: function(event){
+		console.log("mouse location:");
+        this.mousex = event.clientX;
+        this.mousey = event.clientY;
+	}
+}
 
 var Key = {
 	pressed: {},
@@ -29,40 +43,44 @@ window.onload = function(){
 	setInterval(main_loop, 1000 / 60);
 	window.addEventListener("keydown", function(event){Key.onKeyDown(event);}, false);
 	window.addEventListener("keyup", function(event){Key.onKeyUp(event);}, false);
+	window.addEventListener("mousemove", function(event){Mouse.move(event);}, false);
 
 	gary = new Gary();
     camera = new Camera();
     generate_chunk();
-    // for(var y = 0; y < level1.length; y++){
-    //     for(var x = 0; x < level1[0].length; x++) {
-	//   	if(level1[y][x] == 1)
-    //     		blocks.push(new Block(x * 40, y * 40));
-    //     }
-    // }
+
 
 }
 
 function main_loop(){
-	// update
-	gary.update();
-	camera.update();
-    for(var i = 0; i < enemies.length; i++){
-        enemies[i].update();
-    }
-	// render
-
-	context.fillStyle = "#ffffff"
+    context.fillStyle = "#ffffff"
     context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "#000000"
+    context.strokeRect(0, 0, canvas.width, canvas.height);
 
-	for(var i = 0; i < blocks.length; i++){
-		blocks[i].render();
+    if(game_state == "INGAME") {
+        // update
+        gary.update();
+        camera.update();
+        for (var i = 0; i < enemies.length; i++) {
+            if (!enemies[i].rem) enemies[i].update();
+            else enemies.splice(i, 1);
+        }
+        // render
+
+
+        for (var i = 0; i < blocks.length; i++) {
+            blocks[i].render();
+        }
+
+        for (var i = 0; i < enemies.length; i++) {
+            enemies[i].render();
+        }
+        if (Math.floor(Math.random() * 5) == 0) enemies.push(new TypicalEnemy(Math.random() * 10000 * 40, canvas.height - 100));
+        gary.render();
+    } else {
+		render_menu();
 	}
-
-    for(var i = 0; i < enemies.length; i++){
-        enemies[i].render();
-    }
-	if(Math.floor(Math.random() * 5) == 0) enemies.push(new TypicalEnemy(Math.random() * 10000 * 40, canvas.height - 100));
-    gary.render();
 
 }
 
@@ -85,7 +103,11 @@ function Gary(){
 	var speed_cap = 20;
 	var timer = 0;
 	var jump_vel = 0;
-	
+
+	this.norm = function(value, min, max){
+		return (value - min) / (max - min);
+	}
+
 	this.update = function(){
 		timer++;
 		timer %= 60;
@@ -99,7 +121,6 @@ function Gary(){
 			gravity = 0;
 			this.vely = 0;
 		}
-	
 		if(gravity > 20) gravity = 20;
 	
 		if(Key.pressed[37]) this.velx -= speed;
@@ -112,13 +133,25 @@ function Gary(){
 			jump_vel -= 10;
 		} else jump_vel = 0;
 		
-		if(this.velx < 0) current_stance = left_stance;
-		if(this.velx > 0) current_stance = right_stance;
+		if(this.velx < 0) {
+            var volume = -this.norm(this.velx, 0, speed_cap);
+            if(volume < 0.01) volume = 0.01;
+            if(volume > 1) volume = 1;
+            the_one_and_only_audio.volume = volume;
+            current_stance = left_stance;
+        }
+		if(this.velx > 0){
+			var volume = this.norm(this.velx, 0, speed_cap);
+            if(volume < 0.1) volume = 0.1;
+			if(volume > 1) volume = 1;
+            the_one_and_only_audio.volume = volume;
+            current_stance = right_stance;
+		}
 		
 		if(this.velx > speed_cap) this.velx = speed_cap;
 		if(this.velx < -speed_cap) this.velx = -speed_cap;
 		
-		
+
 		this.vely += jump_vel;
 		if(this.velx != 0 || this.vely != 0) this.move(this.velx, this.vely);
 	}
@@ -211,6 +244,7 @@ function TypicalEnemy(x, y){
     this.y = y;
     this.velx = 0;
     this.vely = 0;
+    this.rem = false;
 
     var gravity = 0;
     var grav_acc = 0.08;
@@ -220,7 +254,6 @@ function TypicalEnemy(x, y){
 
     this.update = function(){
         var grounded = this.on_ground(this.vely);
-
         if(!grounded){
             gravity += grav_acc;
             this.vely += gravity;
@@ -240,10 +273,12 @@ function TypicalEnemy(x, y){
             if(once++ == 0)score++;
             return;
 		}
+
+		if(this.y > canvas.height) this.rem = true;
+
         if(gravity > 20) gravity = 20;
         if(this.velx != 0 || this.vely != 0) this.move(this.velx, this.vely);
     }
-
 
     this.move = function(xa, ya){
         if(xa != 0 && ya != 0){
@@ -269,6 +304,17 @@ function TypicalEnemy(x, y){
                 if (x0 < blocks[i].x1 && x1 > blocks[i].x0 &&
                     y0 < blocks[i].y1 && y1 > blocks[i].y0) return false;
             }
+
+            for(var i = 0; i < enemies.length; i++){
+            	if(enemies[i] != this){
+                    var ex0 = enemies[i].x;
+                    var ex1 = enemies[i].x + 7 * 10;
+                    var ey0 = enemies[i].y - 20;
+                    var ey1 = enemies[i].y;
+
+                    if(x0 < ex1 && x1 > ex0 && y0 < ey1 && y1 > ey0) return false;
+				}
+			}
         }
         return true;
     }
@@ -319,7 +365,7 @@ function Camera(){
 
     this.update = function(){
         this.x = gary.x - canvas.width / 2;
-        this.y = gary.y - canvas.height / 2;
+        this.y = gary.y - canvas.height / 2 - 120;
     }
 
 }
@@ -339,15 +385,27 @@ function generate_chunk(){
     }
 }
 
-/************LEVELS********************/
 
-// var level1 =
-// 	[[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
-// 	 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
-// 	 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
-// 	 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
-// 	 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
-// 	 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
-// 	 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
-// 	 [1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
-// 	 [1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ]];
+function render_menu(){
+
+	// TODO fix the menu(make the mouse work nice) and you are good to go!
+
+	var options = [
+		"Start Game", "About"
+	];
+
+    context.font = "100px Arial";
+    context.fillStyle = "#000000";
+    context.fillText("ᕕ( ᐛ )ᕗ", 0, 150);
+
+    context.font = "45px Arial";
+    context.fillStyle = "#000000";
+	for(var i = 0; i < options.length; i++) {
+        context.fillText(options[i], canvas.width / 2 - 250, 300 + i * 48);
+    }
+
+
+}
+
+
+
