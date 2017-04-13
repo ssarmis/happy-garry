@@ -11,21 +11,8 @@ var enemies = [];
 var the_one_and_only_audio = new Audio("DONT FUCKING STOP ME.mp3");
 
 the_one_and_only_audio.loop = true;
-the_one_and_only_audio.volume = 0.1;
-
+the_one_and_only_audio.volume = 0.01;
 var score = 0;
-
-var game_state = "MENU";
-
-var Mouse = {
-	mousex: 0,
-    mousey: 0,
-    move: function(event){
-		console.log("mouse location:");
-        this.mousex = event.clientX;
-        this.mousey = event.clientY;
-	}
-}
 
 var Key = {
 	pressed: {},
@@ -43,7 +30,6 @@ window.onload = function(){
 	setInterval(main_loop, 1000 / 60);
 	window.addEventListener("keydown", function(event){Key.onKeyDown(event);}, false);
 	window.addEventListener("keyup", function(event){Key.onKeyUp(event);}, false);
-	window.addEventListener("mousemove", function(event){Mouse.move(event);}, false);
 
 	gary = new Gary();
     camera = new Camera();
@@ -58,29 +44,25 @@ function main_loop(){
     context.fillStyle = "#000000"
     context.strokeRect(0, 0, canvas.width, canvas.height);
 
-    if(game_state == "INGAME") {
-        // update
-        gary.update();
-        camera.update();
-        for (var i = 0; i < enemies.length; i++) {
-            if (!enemies[i].rem) enemies[i].update();
-            else enemies.splice(i, 1);
-        }
-        // render
+    // update
+    gary.update();
+    camera.update();
+    for (var i = 0; i < enemies.length; i++) {
+        if (!enemies[i].rem) enemies[i].update();
+        else enemies.splice(i, 1);
+    }
+    // render
 
 
-        for (var i = 0; i < blocks.length; i++) {
-            blocks[i].render();
-        }
+    for (var i = 0; i < blocks.length; i++) {
+        blocks[i].render();
+    }
 
-        for (var i = 0; i < enemies.length; i++) {
-            enemies[i].render();
-        }
-        if (Math.floor(Math.random() * 5) == 0) enemies.push(new TypicalEnemy(Math.random() * 10000 * 40, canvas.height - 100));
-        gary.render();
-    } else {
-		render_menu();
-	}
+    for (var i = 0; i < enemies.length; i++) {
+        enemies[i].render();
+    }
+    if (Math.floor(Math.random() * 5) == 0) enemies.push(new TypicalEnemy(Math.random() * 10000 * 40, canvas.height - 100));
+    gary.render();
 
 }
 
@@ -134,15 +116,15 @@ function Gary(){
 		} else jump_vel = 0;
 		
 		if(this.velx < 0) {
-            var volume = -this.norm(this.velx, 0, speed_cap);
+            var volume = -this.norm(this.velx * 0.8, 0, speed_cap);
             if(volume < 0.01) volume = 0.01;
             if(volume > 1) volume = 1;
             the_one_and_only_audio.volume = volume;
             current_stance = left_stance;
         }
 		if(this.velx > 0){
-			var volume = this.norm(this.velx, 0, speed_cap);
-            if(volume < 0.1) volume = 0.1;
+			var volume = this.norm(this.velx * 0.8, 0, speed_cap);
+            if(volume < 0.01) volume = 0.01;
 			if(volume > 1) volume = 1;
             the_one_and_only_audio.volume = volume;
             current_stance = right_stance;
@@ -174,11 +156,14 @@ function Gary(){
 		if(x0 < 0) return false;
 		var x1 = this.x + current_stance.length * 10 + xa;
 		var y0 = this.y - 20 + ya;
-		var y1 = this.y + ya;
+		var y1 = this.y + ya - 5;
 		
 		for(var i = 0; i < blocks.length; i++){
 			if(x0 < blocks[i].x1 && x1 > blocks[i].x0 &&
-			   y0 < blocks[i].y1 && y1 > blocks[i].y0) return false;
+			   y0 < blocks[i].y1 && y1 > blocks[i].y0){
+                this.velx = 0;
+                return false;
+            }
 		}
 		return true;
 	}
@@ -197,6 +182,10 @@ function Gary(){
 	}
 	
 	this.render = function(){
+        context.font = "12px Arial";
+        context.fillText("Created by Stephancode (Streanga Sarmis-Stefan)", 20, canvas.height - 12 * 2);
+        context.fillText("Song: Queen - Don't Stop Me Now", 20, canvas.height - 12);
+
         context.font = "20px Arial";
         context.fillStyle = "#000000";
         if(this.velx > speed_cap / 2)
@@ -383,28 +372,6 @@ function generate_chunk(){
     for(var i = 0; i <= 10; i++){
         blocks.push(new Block(1000 * 40, canvas.height - 40 + i * -40));
     }
-}
-
-
-function render_menu(){
-
-	// TODO fix the menu(make the mouse work nice) and you are good to go!
-
-	var options = [
-		"Start Game", "About"
-	];
-
-    context.font = "100px Arial";
-    context.fillStyle = "#000000";
-    context.fillText("ᕕ( ᐛ )ᕗ", 0, 150);
-
-    context.font = "45px Arial";
-    context.fillStyle = "#000000";
-	for(var i = 0; i < options.length; i++) {
-        context.fillText(options[i], canvas.width / 2 - 250, 300 + i * 48);
-    }
-
-
 }
 
 
